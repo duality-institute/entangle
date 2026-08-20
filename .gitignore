@@ -1,0 +1,13 @@
+node_modules
+dist
+
+.idea/
+.vscode/
+.DS_Store
+
+.playwright-mcp/
+.omo/
+
+*.log
+.env
+.env.*

@@ -1,0 +1,177 @@
+/*
+ * entangle — design tokens
+ * ------------------------------------------------------------------
+ * The single source of truth for every visual decision in the mobile UI.
+ * Downstream UI code MUST reference these custom properties; no literal
+ * colours, spacing values, radii, or font sizes anywhere else.
+ *
+ * Naming contract:
+ *   colour ...........  --bg-* --surface-* --border-* --text-* --accent-*
+ *   layout ...........  --space-* --radius-* --touch-*
+ *   type .............  --font-* --text-* --leading-* --tracking-*
+ *   roles ............  --agent-{1..6} --status-{idle,busy,retry,error}
+ *   effects ..........  --shadow-* --blur-* --ease-* --dur-*
+ */
+
+:root {
+  color-scheme: dark;
+
+  /* ---------- palette primitives (do not use directly in components) --- */
+  --ink-900: #05070a;
+  --ink-800: #080b10;
+  --ink-700: #0d1119;
+  --ink-600: #121824;
+  --ink-500: #18202e;
+  --ink-400: #202939;
+  --ink-300: #2b3547;
+
+  --mint-400: #5eead4;
+  --mint-500: #2dd4bf;
+  --mint-600: #14b8a6;
+
+  /* ---------- surfaces --------------------------------------------------- */
+  --bg: var(--ink-800);
+  --bg-deep: var(--ink-900);
+  /* Ambient aurora painted behind the shell; keeps flat dark from feeling dead. */
+  --bg-glow: radial-gradient(
+      120% 78% at 50% -12%,
+      rgba(45, 212, 191, 0.16) 0%,
+      rgba(45, 212, 191, 0) 62%
+    ),
+    radial-gradient(90% 55% at 100% 4%, rgba(96, 165, 250, 0.1) 0%, rgba(96, 165, 250, 0) 70%);
+
+  --surface: var(--ink-700);
+  --surface-raised: var(--ink-600);
+  --surface-sunken: var(--ink-900);
+  --surface-overlay: rgba(13, 17, 25, 0.82);
+  --surface-hover: var(--ink-500);
+
+  /* ---------- borders ---------------------------------------------------- */
+  --border: rgba(255, 255, 255, 0.07);
+  --border-strong: rgba(255, 255, 255, 0.14);
+  --border-accent: rgba(45, 212, 191, 0.38);
+
+  /* ---------- text ------------------------------------------------------- */
+  --text-primary: #e6edf5;
+  --text-muted: #94a3b8;
+  --text-faint: #64748b;
+  --text-inverse: #04211d;
+
+  /* ---------- accent ----------------------------------------------------- */
+  --accent: var(--mint-400);
+  --accent-strong: var(--mint-500);
+  --accent-deep: var(--mint-600);
+  --accent-contrast: var(--text-inverse);
+  --accent-soft: rgba(45, 212, 191, 0.14);
+  --accent-ring: rgba(45, 212, 191, 0.32);
+
+  /* ---------- agent colour slots (assigned round-robin per agent name) --- */
+  --agent-1: #5eead4;
+  --agent-2: #fbbf24;
+  --agent-3: #a78bfa;
+  --agent-4: #fb7185;
+  --agent-5: #60a5fa;
+  --agent-6: #a3e635;
+  /* Per-message override target: components set --agent-color locally. */
+  --agent-color: var(--agent-1);
+
+  /* ---------- status colours (connection + turn lifecycle) --------------- */
+  --status-idle: #7c8ba1;
+  --status-busy: var(--mint-400);
+  --status-retry: #f59e0b;
+  --status-error: #fb7185;
+  --status-idle-soft: rgba(124, 139, 161, 0.16);
+  --status-busy-soft: rgba(94, 234, 212, 0.16);
+  --status-retry-soft: rgba(245, 158, 11, 0.16);
+  --status-error-soft: rgba(251, 113, 133, 0.16);
+
+  /* ---------- typography ------------------------------------------------- */
+  --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto,
+    "Helvetica Neue", system-ui, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", SFMono-Regular, "JetBrains Mono", "Fira Code",
+    "Roboto Mono", Menlo, Consolas, monospace;
+
+  --text-2xs: 0.6875rem; /* 11px — meta, timestamps */
+  --text-xs: 0.75rem; /* 12px — labels, pills */
+  --text-sm: 0.8125rem; /* 13px — secondary body */
+  --text-base: 0.9375rem; /* 15px — chat body */
+  --text-lg: 1.0625rem; /* 17px — emphasis */
+  --text-xl: 1.25rem; /* 20px — section titles */
+  --text-2xl: 1.5rem; /* 24px — empty-state headline */
+  /* Any focusable text field MUST use this: iOS Safari auto-zooms the page
+     when a focused input renders below 16px. */
+  --text-input: 1rem; /* 16px */
+
+  --leading-tight: 1.2;
+  --leading-snug: 1.35;
+  --leading-normal: 1.5;
+  --leading-relaxed: 1.65;
+
+  --tracking-tight: -0.015em;
+  --tracking-normal: 0;
+  --tracking-wide: 0.06em;
+  --tracking-caps: 0.14em;
+
+  --weight-regular: 400;
+  --weight-medium: 500;
+  --weight-semibold: 600;
+  --weight-bold: 700;
+
+  /* ---------- spacing scale (4px grid) ----------------------------------- */
+  --space-0: 0px;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-7: 32px;
+  --space-8: 40px;
+  --space-9: 48px;
+  --space-10: 64px;
+
+  /* ---------- radii ------------------------------------------------------ */
+  --radius-xs: 6px;
+  --radius-sm: 10px;
+  --radius-md: 14px;
+  --radius-lg: 18px;
+  --radius-xl: 24px;
+  --radius-pill: 999px;
+
+  /* ---------- touch ------------------------------------------------------ */
+  --touch-target: 44px; /* iOS HIG minimum */
+  --touch-gap: var(--space-2);
+
+  /* ---------- elevation -------------------------------------------------- */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 8px 24px -12px rgba(0, 0, 0, 0.7);
+  --shadow-lg: 0 20px 48px -20px rgba(0, 0, 0, 0.8);
+  --shadow-accent: 0 0 0 1px var(--accent-ring), 0 8px 28px -14px rgba(45, 212, 191, 0.6);
+  --blur-chrome: 18px;
+
+  /* ---------- motion ----------------------------------------------------- */
+  --dur-fast: 120ms;
+  --dur-base: 200ms;
+  --dur-slow: 360ms;
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+
+  /* ---------- layout slots ----------------------------------------------- */
+  /* Safe-area insets are wrapped in max() because iOS intermittently reports
+     0px for env(safe-area-inset-bottom) even on notched hardware. */
+  --safe-top: max(var(--space-2), env(safe-area-inset-top, 0px));
+  --safe-bottom: max(12px, env(safe-area-inset-bottom, 0px));
+  --safe-left: max(var(--space-0), env(safe-area-inset-left, 0px));
+  --safe-right: max(var(--space-0), env(safe-area-inset-right, 0px));
+
+  --header-height: 44px;
+  --content-max-width: 720px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --dur-fast: 1ms;
+    --dur-base: 1ms;
+    --dur-slow: 1ms;
+  }
+}

@@ -1,0 +1,97 @@
+/*
+ * entangle — unpaired / re-pair screen
+ * Tokens only: no hard-coded colours, spacing, radii, or font sizes.
+ */
+
+.unpaired {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-4);
+  height: 100%;
+  width: 100%;
+  max-width: var(--content-max-width);
+  margin-inline: auto;
+  padding: var(--space-6) var(--space-5);
+  padding-top: calc(var(--safe-top) + var(--space-6));
+  padding-bottom: calc(var(--safe-bottom) + var(--space-6));
+  text-align: center;
+}
+
+.unpaired__title {
+  margin: 0;
+  font-size: var(--text-xl);
+  font-weight: var(--weight-semibold);
+  letter-spacing: var(--tracking-tight);
+  line-height: var(--leading-tight);
+}
+
+.unpaired__body {
+  margin: 0;
+  max-width: 34ch;
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+  line-height: var(--leading-relaxed);
+}
+
+.unpaired__command {
+  display: inline-block;
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface-sunken);
+  color: var(--accent);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+}
+
+.unpaired__steps {
+  margin: 0;
+  padding: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  width: 100%;
+  max-width: 34ch;
+  list-style: none;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+  counter-reset: unpaired-step;
+  text-align: left;
+}
+
+.unpaired__step {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+  line-height: var(--leading-snug);
+}
+
+.unpaired__step::before {
+  counter-increment: unpaired-step;
+  content: counter(unpaired-step);
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: var(--space-5);
+  height: var(--space-5);
+  border-radius: var(--radius-pill);
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  font-weight: var(--weight-semibold);
+}
+
+.unpaired__note {
+  margin: 0;
+  color: var(--text-faint);
+  font-size: var(--text-2xs);
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+}
