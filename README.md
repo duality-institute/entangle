@@ -1,6 +1,6 @@
 # entangle
 
-Mobile-control a running [opencode](https://opencode.ai) session. Run the CLI, scan the QR code, and continue the same conversation from your phone over trusted Wi-Fi or Tailscale.
+An [opencode](https://opencode.ai) plugin to mobile-control a running opencode session. Run the CLI, scan the QR code, and continue the same conversation from your phone over trusted Wi-Fi or Tailscale.
 
 ![Entangle mobile UI](entangle-mobile-ui.png)
 
