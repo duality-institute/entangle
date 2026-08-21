@@ -9,11 +9,11 @@
  *   1. lastEventId replay  — every reconnect resumes from the last applied id.
  *      `EventSource` cannot set headers, so we pass `?lastEventId=` (the server
  *      honours both that and the `Last-Event-ID` header).
- *   2. staleness watchdog  — the server's `: heartbeat` comments do NOT fire
- *      `onmessage`, so JS silence is not proof of death. After 15s of silence
- *      we probe `/api/state`: a 401 means unpaired (stop), anything else means
- *      the server is reachable and our socket is the suspect, so we recycle it.
- *      Recycling is lossless because replay refills the gap.
+ *   2. staleness watchdog  — the server's heartbeat data frames fire
+ *      `onmessage`, which rearms the timer without entering application state.
+ *      After 30s of true wire silence we probe `/api/state`: a 401 means
+ *      unpaired (stop); otherwise we recycle the suspect socket. Recycling is
+ *      lossless because replay refills the gap.
  *   3. visibilitychange    — close on hidden, reopen with replay on visible.
  *
  * Backoff is 1s → 2s → 4s → 8s → capped at 10s. A 401 stops retrying entirely.
@@ -23,7 +23,7 @@ import { isSseReplayGap, type SseFrame } from "./protocol";
 import { parseSseData, type AppStore, type ConnectionState } from "./appState";
 import { ApiClient, UnauthorizedError } from "./api";
 
-const STALE_TIMEOUT_MS = 15_000;
+const STALE_TIMEOUT_MS = 30_000;
 const BACKOFF_BASE_MS = 1_000;
 const BACKOFF_MAX_MS = 10_000;
 

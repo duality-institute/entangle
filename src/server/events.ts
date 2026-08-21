@@ -8,6 +8,8 @@ interface SinceResult<T> {
   gap: boolean
 }
 
+const HEARTBEAT_FRAME = 'data: {"heartbeat":true}\n\n'
+
 export class EventLog<T> {
   private readonly buffer: EventRecord<T>[] = []
   private nextId = 1
@@ -101,7 +103,7 @@ export function sseStream<T>(request: Request, log: EventLog<T>, broadcaster: Br
         for (const event of replay.events) send(event)
       }
       heartbeat = setInterval(() => {
-        if (!closed) controller.enqueue(encoder.encode(": heartbeat\n\n"))
+        if (!closed) controller.enqueue(encoder.encode(HEARTBEAT_FRAME))
       }, 10_000)
     },
     cancel() {

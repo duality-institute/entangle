@@ -94,6 +94,10 @@ class FakeTimers implements Timers {
   get pendingDelays(): number[] {
     return [...this.entries.values()].map((entry) => entry.ms)
   }
+
+  get scheduledCount(): number {
+    return this.seq
+  }
 }
 
 const flush = () => new Promise((resolve) => setTimeout(resolve, 0))
@@ -715,7 +719,7 @@ test("hidden closes the EventSource and visible reconnects with the replay curso
 
 /* -------------------------------------------------------------- stream 5 -- */
 
-test("the 15s watchdog recycles a silent socket but stops dead on a 401", async () => {
+test("the 30s watchdog recycles a silent socket but stops dead on a 401", async () => {
   FakeEventSource.reset()
   const timers = new FakeTimers()
   let alive = true
@@ -733,9 +737,7 @@ test("the 15s watchdog recycles a silent socket but stops dead on a 401", async 
   FakeEventSource.last.emit(wireFrame(4, "session.idle", {}), "4")
   const zombie = FakeEventSource.last
 
-  // Heartbeat comments never fire onmessage, so silence alone is not death:
-  // the probe says the server is fine, so we recycle the socket and replay.
-  expect(timers.fire(15_000)).toBe(1)
+  expect(timers.fire(30_000)).toBe(1)
   await flush()
   expect(zombie.closed).toBe(true)
   expect(FakeEventSource.last).not.toBe(zombie)
@@ -743,7 +745,7 @@ test("the 15s watchdog recycles a silent socket but stops dead on a 401", async 
 
   // Now the probe 401s: unpaired, everything torn down, nothing rescheduled.
   alive = false
-  timers.fire(15_000)
+  timers.fire(30_000)
   await flush()
   expect(client.connectionState).toBe("unpaired")
   expect(FakeEventSource.last.closed).toBe(true)
@@ -754,6 +756,35 @@ test("the 15s watchdog recycles a silent socket but stops dead on a 401", async 
   timers.fire()
   await flush()
   expect(FakeEventSource.instances).toHaveLength(count) // no retry loop
+})
+
+test("an observable heartbeat rearms the watchdog without advancing the replay cursor", () => {
+  FakeEventSource.reset()
+  const timers = new FakeTimers()
+  const frames: shared.SseFrame[] = []
+  const states: string[] = []
+  const client = new StreamClient({
+    lastEventId: 7,
+    timers,
+    visibility: null,
+    createEventSource: (url) => new FakeEventSource(url),
+    onFrame: (frame) => frames.push(frame),
+    onConnection: (state) => states.push(state),
+  })
+
+  client.start()
+  FakeEventSource.last.open()
+  const scheduledBeforeHeartbeat = timers.scheduledCount
+  FakeEventSource.last.emit(JSON.stringify({ heartbeat: true }), "7")
+
+  expect(timers.scheduledCount).toBe(scheduledBeforeHeartbeat + 1)
+  expect(timers.pendingDelays).toEqual([30_000])
+  expect(client.lastEventId).toBe(7)
+  expect(frames).toEqual([])
+  expect(states).toEqual(["live"])
+  expect(FakeEventSource.instances).toHaveLength(1)
+
+  client.stop()
 })
 
 /* ---------------------------------------------------------- controller 1 -- */

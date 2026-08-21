@@ -421,7 +421,8 @@ export default function App() {
       />
 
       <Composer
-        disabled={state.connection !== "live" || !!permission || sending}
+        disabled={!!permission || sending}
+        submitDisabled={state.connection !== "live"}
         onSend={send}
         hint={busy ? "generation running — new prompts are queued" : undefined}
       >

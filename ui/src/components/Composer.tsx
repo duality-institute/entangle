@@ -33,6 +33,8 @@ interface ComposerProps {
   onSend: (text: string) => void;
   /** Unpaired, or a permission is pending: the whole bar is inert. */
   disabled?: boolean;
+  /** Keep drafting available, but block submission until the connection is live. */
+  submitDisabled?: boolean;
   placeholder?: string;
   /** Chip rail slot — agent chip, model chip, abort button. */
   children?: ReactNode;
@@ -63,6 +65,7 @@ function isCoarsePointer(): boolean {
 export default function Composer({
   onSend,
   disabled = false,
+  submitDisabled = false,
   placeholder = "Message your agent…",
   children,
   hint,
@@ -109,10 +112,10 @@ export default function Composer({
 
   const send = useCallback(() => {
     const trimmed = text.trim();
-    if (!trimmed || disabled) return;
+    if (!trimmed || disabled || submitDisabled) return;
     onSend(trimmed);
     setText("");
-  }, [disabled, onSend, text]);
+  }, [disabled, onSend, submitDisabled, text]);
 
   const onKeyDown = useCallback(
     (event: KeyboardEvent<HTMLTextAreaElement>) => {
@@ -130,10 +133,14 @@ export default function Composer({
     [coarse, send],
   );
 
-  const canSend = !disabled && text.trim().length > 0;
+  const canSend = !disabled && !submitDisabled && text.trim().length > 0;
 
   return (
-    <footer className="composer" data-testid="composer" data-disabled={disabled ? "true" : "false"}>
+    <footer
+      className="composer"
+      data-testid="composer"
+      data-disabled={disabled || submitDisabled ? "true" : "false"}
+    >
       {children ? <div className="composer__meta">{children}</div> : null}
 
       <div className="composer__row">

@@ -307,17 +307,18 @@ describe("MobileServer", () => {
     expect(events.size).toBe(1)
   })
 
-  test("GET /api/events remains open through two idle heartbeat periods", async () => {
-    const { base, cookie } = await paired()
+  test("GET /api/events emits observable heartbeats without consuming event ids", async () => {
+    const { base, cookie, events } = await paired()
     const response = await fetch(`${base}/api/events`, { headers: { cookie } })
     const reader = response.body!.getReader()
     expect(new TextDecoder().decode((await reader.read()).value)).toBe(": open\n\n")
 
     const connectedAt = performance.now()
     const chunks: string[] = []
+    const heartbeat = 'data: {"heartbeat":true}\n\n'
     let ended = false
     const timer = setTimeout(() => void reader.cancel(), 22_000)
-    while (chunks.filter((chunk) => chunk === ": heartbeat\n\n").length < 2) {
+    while (chunks.filter((chunk) => chunk === heartbeat).length < 2) {
       const result = await reader.read()
       if (result.done) {
         ended = true
@@ -329,7 +330,9 @@ describe("MobileServer", () => {
     if (!ended) await reader.cancel()
 
     expect(ended).toBe(false)
-    expect(chunks.filter((chunk) => chunk === ": heartbeat\n\n")).toHaveLength(2)
+    expect(chunks.filter((chunk) => chunk === heartbeat)).toHaveLength(2)
+    expect(chunks.some((chunk) => chunk.includes("id:"))).toBe(false)
+    expect(events.channel(FIXTURE_SESSION.id).log.currentId).toBe(0)
     expect(performance.now() - connectedAt).toBeGreaterThan(19_500)
   }, 25_000)
 

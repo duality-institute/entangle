@@ -1,7 +1,7 @@
 {
   "name": "@dualityinstitute/entangle",
-  "version": "0.1.0",
-  "description": "Control a running opencode session from your phone over your local network.",
+  "version": "0.1.1",
+  "description": "Control a running opencode session from your phone.",
   "license": "MIT",
   "type": "module",
   "homepage": "https://github.com/duality-institute/entangle#readme",
