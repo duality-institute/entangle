@@ -26,6 +26,7 @@ const PULL_SLOP = 24;
 
 export interface PendingPrompt {
   correlationID: string;
+  messageID: string;
   text: string;
 }
 
@@ -39,6 +40,10 @@ function correlationID(queued: boolean): string {
   return `${queued ? "queued" : "pending"}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 }
 
+function clientMessageID(): string {
+  return `msg_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 12)}`;
+}
+
 interface Reconciliation {
   /** Placeholders still awaiting an echo, in send order. */
   pending: PendingPrompt[];
@@ -48,7 +53,7 @@ interface Reconciliation {
 
 /**
  * Retires one placeholder per unclaimed server echo, oldest echo first, matching
- * the oldest same-text placeholder. Pure: the caller owns `settled` and must fold
+ * the caller-assigned message id. Pure: the caller owns `settled` and must fold
  * the returned ids into it, which is what stops an echo claiming a second bubble.
  */
 export function reconcilePending(
@@ -62,8 +67,7 @@ export function reconcilePending(
   for (const message of messages) {
     if (remaining.length === 0) break;
     if (message.info.role !== "user" || settled.has(message.info.id)) continue;
-    const text = pendingText(message);
-    const index = remaining.findIndex((prompt) => prompt.text === text);
+    const index = remaining.findIndex((prompt) => prompt.messageID === message.info.id);
     if (index === -1) continue;
     remaining.splice(index, 1);
     claimed.push(message.info.id);
@@ -83,14 +87,6 @@ function describeError(error: string): string {
   if (/overload|rate.?limit|429/i.test(error)) return "the provider is overloaded — try again shortly";
   if (/output.?length|context|token/i.test(error)) return "the model ran out of room — start a new turn";
   return error;
-}
-
-function pendingText(message: ChatMessageDto): string {
-  return message.parts
-    .filter((part): part is Extract<Part, { type: "text" }> => part.type === "text")
-    .map((part) => part.text)
-    .join("")
-    .trim();
 }
 
 function placeholderMessage(
@@ -187,8 +183,7 @@ export default function App() {
   const olderCursor = useRef<string | undefined>(undefined);
   const [scrollPort, setScrollPort] = useState<HTMLElement | null>(null);
   const anchor = useRef<{ height: number; top: number } | null>(null);
-  // Server user messages that can no longer confirm a send: either they already
-  // retired a placeholder, or they were on screen before the placeholder existed.
+  // Server user messages that already retired a placeholder.
   const settled = useRef(new Set<string>());
   // Scroll fires many times per gesture; a state flag lands a render too late
   // to stop the second call, so the in-flight latch has to be a ref.
@@ -248,7 +243,7 @@ export default function App() {
   const activePartID = busy ? streamingPartID : undefined;
 
   // Reconcile: the server's copy of a prompt has landed, so drop that ONE
-  // placeholder — the `settled` fold is what lets a second identical send survive.
+  // placeholder — the `settled` fold makes replayed events idempotent.
   useEffect(() => {
     if (pending.length === 0) return;
     const reconciled = reconcilePending(pending, state.messages, settled.current);
@@ -259,19 +254,16 @@ export default function App() {
 
   const send = useCallback(
     (text: string) => {
-      const prompt: PendingPrompt = { correlationID: correlationID(busy), text };
-      // Text already on screen predates this prompt and cannot be its echo —
-      // without this, re-sending old text would self-confirm instantly. An echo
-      // whose parts have not landed yet is textless, so it stays claimable.
-      for (const message of store.getState().messages) {
-        if (message.info.role === "user" && pendingText(message) !== "") {
-          settled.current.add(message.info.id);
-        }
-      }
+      const prompt: PendingPrompt = {
+        correlationID: correlationID(busy),
+        messageID: clientMessageID(),
+        text,
+      };
       setPending((current) => [...current, prompt]);
       setSending(true);
       const request: PromptRequest = {
         text,
+        messageID: prompt.messageID,
         ...(state.nextAgent ? { agent: state.nextAgent } : {}),
         ...(state.nextModel ? { model: state.nextModel } : {}),
       };
@@ -310,10 +302,6 @@ export default function App() {
         if (older.length === 0) {
           anchor.current = null;
           return;
-        }
-        // History arriving from the past cannot be the echo of a live send.
-        for (const message of older) {
-          if (message.info.role === "user") settled.current.add(message.info.id);
         }
         store.dispatch({
           type: "messages/loaded",

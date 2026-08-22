@@ -38,6 +38,13 @@ const SAMPLE_DIFF = `--- a/src/server/bridge.ts
    }
 `;
 
+const SAMPLE_TODOS = [
+  { content: "Trace the live todo payload", status: "completed", priority: "high" },
+  { content: "Render structured tasks instead of JSON", status: "in_progress", priority: "high" },
+  { content: "Check narrow-phone wrapping", status: "pending", priority: "medium" },
+  { content: "Remove the legacy raw view", status: "cancelled", priority: "low" },
+];
+
 const USER_PARTS: Part[] = [
   {
     id: "prt_user_text",
@@ -132,6 +139,21 @@ const ASSISTANT_PARTS: Part[] = [
   },
   {
     ...base,
+    id: "prt_tool_todowrite",
+    type: "tool",
+    callID: "call_todowrite_1",
+    tool: "todowrite",
+    state: {
+      status: "completed",
+      input: { todos: SAMPLE_TODOS },
+      output: JSON.stringify(SAMPLE_TODOS),
+      title: "4 todos",
+      metadata: { todos: SAMPLE_TODOS, truncated: false },
+      time: { start: 1_700_000_004_100, end: 1_700_000_004_200 },
+    },
+  },
+  {
+    ...base,
     id: "prt_tool_pending",
     type: "tool",
     callID: "call_edit_1",
@@ -166,13 +188,38 @@ const ASSISTANT_PARTS: Part[] = [
   { ...base, id: "prt_snapshot", type: "snapshot", snapshot: "snap_1c0ffee0" },
   {
     ...base,
+    id: "prt_tool_patch",
+    type: "tool",
+    callID: "call_patch_1",
+    tool: "apply_patch",
+    state: {
+      status: "completed",
+      input: { patchText: "*** Begin Patch" },
+      output: "Success. Updated src/server/bridge.ts",
+      title: "Success",
+      metadata: {
+        diff: SAMPLE_DIFF,
+        files: [
+          {
+            filePath: "/repo/src/server/bridge.ts",
+            relativePath: "src/server/bridge.ts",
+            type: "update",
+            patch: SAMPLE_DIFF,
+            additions: 3,
+            deletions: 2,
+          },
+        ],
+      },
+      time: { start: 1_700_000_004_900, end: 1_700_000_005_000 },
+    },
+  },
+  {
+    ...base,
     id: "prt_patch",
     type: "patch",
     hash: "a1b2c3d4",
     files: ["src/server/bridge.ts"],
-    // Non-SDK enrichment; see `PatchDiff` in MessageParts.tsx.
-    diff: SAMPLE_DIFF,
-  } as Part,
+  },
   {
     ...base,
     id: "prt_retry",

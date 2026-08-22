@@ -6,7 +6,7 @@ import { MobileServer, type MobileEvent } from "../src/server/http"
 import * as shared from "../src/shared/protocol"
 import { FakeBridge } from "./fixtures/fake-bridge"
 import * as uiProtocol from "../ui/src/lib/protocol"
-import { abortTurn, reconcilePending, respondToPermission, type PendingPrompt } from "../ui/src/App"
+import { abortTurn, reconcilePending, respondToPermission } from "../ui/src/App"
 import { ApiClient, UnauthorizedError } from "../ui/src/lib/api"
 import {
   applyWireData,
@@ -309,8 +309,8 @@ function userEcho(id: string, text: string): shared.ChatMessageDto {
  * message.updated landed. One echo may retire exactly one placeholder.
  */
 test("two identical-text sends are retired one echo at a time, in order", () => {
-  const first: PendingPrompt = { correlationID: "pending_a", text: "continue" }
-  const second: PendingPrompt = { correlationID: "queued_b", text: "continue" }
+  const first = { correlationID: "pending_a", messageID: "msg_1", text: "continue" }
+  const second = { correlationID: "queued_b", messageID: "msg_2", text: "continue" }
   const settled = new Set<string>()
 
   const afterFirst = reconcilePending([first, second], [userEcho("msg_1", "continue")], settled)
@@ -335,9 +335,9 @@ test("two identical-text sends are retired one echo at a time, in order", () => 
 
 /* --------------------------------------------------------- optimistic 2 -- */
 
-test("reconciliation matches per correlation id and ignores assistant traffic", () => {
-  const alpha: PendingPrompt = { correlationID: "pending_a", text: "alpha" }
-  const beta: PendingPrompt = { correlationID: "pending_b", text: "beta" }
+test("reconciliation matches per message id and ignores assistant traffic", () => {
+  const alpha = { correlationID: "pending_a", messageID: "msg_1", text: "alpha" }
+  const beta = { correlationID: "pending_b", messageID: "msg_2", text: "beta" }
 
   // An assistant reply quoting the prompt must never retire a bubble.
   const noise = {
@@ -352,6 +352,19 @@ test("reconciliation matches per correlation id and ignores assistant traffic", 
   const result = reconcilePending([alpha, beta], [userEcho("msg_2", "beta")], new Set())
   expect(result.pending).toEqual([alpha])
   expect(result.settled).toEqual(["msg_2"])
+})
+
+test("a rewritten server echo retires its pending prompt by message id", () => {
+  const prompt = { correlationID: "pending_a", messageID: "msg_mobile_a", text: "original text" }
+
+  const result = reconcilePending(
+    [prompt],
+    [userEcho("msg_mobile_a", "text rewritten by a hook")],
+    new Set(),
+  )
+
+  expect(result.pending).toEqual([])
+  expect(result.settled).toEqual(["msg_mobile_a"])
 })
 
 /* ----------------------------------------------------------------- api 1 -- */

@@ -167,6 +167,7 @@ export class OpencodeBridge implements Bridge {
     ensureOk(await this.client.session.promptAsync({
       path: { id: sessionID },
       body: {
+        ...(request.messageID !== undefined ? { messageID: request.messageID } : {}),
         ...(request.agent !== undefined ? { agent: request.agent } : {}),
         ...(request.model !== undefined ? { model: request.model } : {}),
         parts: [{ type: "text", text: request.text }],

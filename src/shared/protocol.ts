@@ -40,6 +40,7 @@ export type SessionSummaryDto = Pick<Session, "id" | "title"> & { updatedAt: num
 
 export const PromptRequest = z.object({
   text: z.string(),
+  messageID: z.string().regex(/^msg_[A-Za-z0-9][A-Za-z0-9_-]*$/).optional(),
   agent: z.string().optional(),
   model: z.object({ providerID: z.string(), modelID: z.string() }).optional(),
 })

@@ -137,7 +137,12 @@ describe("MobileServer", () => {
 
   test("POST /api/prompt validates and records a prompt", async () => {
     const { base, cookie, csrf, bridge } = await paired()
-    const prompt = { text: "hello", agent: "plan", model: { providerID: "openai", modelID: "gpt-5" } }
+    const prompt = {
+      text: "hello",
+      messageID: "msg_mobile_1",
+      agent: "plan",
+      model: { providerID: "openai", modelID: "gpt-5" },
+    }
     const response = await fetch(`${base}/api/prompt`, {
       method: "POST",
       headers: mutationHeaders(base, cookie, csrf),
@@ -401,6 +406,7 @@ describe("MobileServer", () => {
     const { base, cookie, csrf } = await paired()
     const headers = mutationHeaders(base, cookie, csrf)
     expect((await fetch(`${base}/api/prompt`, { method: "POST", headers, body: "{}" })).status).toBe(400)
+    expect((await fetch(`${base}/api/prompt`, { method: "POST", headers, body: '{"text":"bad id","messageID":"pending_1"}' })).status).toBe(400)
     expect((await fetch(`${base}/api/permissions/p1`, { method: "POST", headers, body: '{"response":"yes"}' })).status).toBe(400)
   })
 })

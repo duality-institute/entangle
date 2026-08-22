@@ -384,14 +384,21 @@ test("a child session seen before any root cannot affect an explicit root target
 test("sendPrompt uses promptAsync and never the blocking prompt endpoint", async () => {
   const { client, calls } = createStub()
   const bridge = new OpencodeBridge(client, "/repo")
+  const request = {
+    text: "ship it",
+    messageID: "msg_mobile_1",
+    agent: "build",
+    model: { providerID: "anthropic", modelID: "claude-opus-5" },
+  }
 
-  await bridge.sendPrompt(FIXTURE_SESSION_ID, { text: "ship it", agent: "build", model: { providerID: "anthropic", modelID: "claude-opus-5" } })
+  await bridge.sendPrompt(FIXTURE_SESSION_ID, request)
 
   const sent = calls.find((call) => call.method === "session.promptAsync")
   expect(sent).toBeDefined()
   expect(calls.every((call) => call.method !== "session.prompt")).toBe(true)
   expect(sent?.options.path?.id).toBe(FIXTURE_SESSION_ID)
   expect(sent?.options.body).toEqual({
+    messageID: "msg_mobile_1",
     agent: "build",
     model: { providerID: "anthropic", modelID: "claude-opus-5" },
     parts: [{ type: "text", text: "ship it" }],

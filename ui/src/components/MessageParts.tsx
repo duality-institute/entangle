@@ -14,7 +14,7 @@
  * global state, and no side effects beyond local expand/collapse.
  */
 
-import { memo, useCallback, useState } from "react";
+import { memo, useCallback, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 
 import type { Part } from "../lib/protocol";
@@ -33,6 +33,12 @@ type Narrow<T extends Part["type"]> = Extract<Part, { type: T }>;
  */
 interface PatchDiff {
   diff?: string;
+  additions?: number;
+  deletions?: number;
+}
+
+interface CompletedPatchData extends PatchDiff {
+  files: string[];
 }
 function firstLine(text: string): string {
   const line = text.split("\n", 1)[0] ?? "";
@@ -84,6 +90,167 @@ function countDiff(diff: string): { additions: number; deletions: number } {
     else if (line.startsWith("-")) deletions += 1;
   }
   return { additions, deletions };
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function completedPatchData(part: Part): CompletedPatchData | undefined {
+  if (part.type !== "tool" || part.tool !== "apply_patch" || part.state.status !== "completed") return undefined;
+
+  const metadataFiles = part.state.metadata.files;
+  const files: string[] = [];
+  let additions = 0;
+  let deletions = 0;
+  let hasCounts = false;
+
+  if (Array.isArray(metadataFiles)) {
+    for (const file of metadataFiles) {
+      if (!isRecord(file)) continue;
+      if (typeof file.filePath === "string") files.push(file.filePath);
+      if (typeof file.relativePath === "string") files.push(file.relativePath);
+      if (typeof file.additions === "number") {
+        additions += file.additions;
+        hasCounts = true;
+      }
+      if (typeof file.deletions === "number") {
+        deletions += file.deletions;
+        hasCounts = true;
+      }
+    }
+  }
+
+  return {
+    files,
+    diff: typeof part.state.metadata.diff === "string" ? part.state.metadata.diff : undefined,
+    additions: hasCounts ? additions : undefined,
+    deletions: hasCounts ? deletions : undefined,
+  };
+}
+
+function sameFile(candidate: string, patchFile: string): boolean {
+  return candidate === patchFile || candidate.endsWith(`/${patchFile}`) || patchFile.endsWith(`/${candidate}`);
+}
+
+function completedPatchesByPart(parts: Part[]): Map<string, PatchDiff> {
+  const pending: CompletedPatchData[] = [];
+  const result = new Map<string, PatchDiff>();
+
+  for (const part of parts) {
+    const completed = completedPatchData(part);
+    if (completed) {
+      pending.push(completed);
+      continue;
+    }
+    if (part.type !== "patch") continue;
+
+    const index = pending.findIndex(
+      (candidate) => candidate.files.length === 0 || part.files.some((file) => candidate.files.some((candidateFile) => sameFile(candidateFile, file))),
+    );
+    if (index < 0) continue;
+    const [matched] = pending.splice(index, 1);
+    if (matched) result.set(part.id, matched);
+  }
+
+  return result;
+}
+
+type TodoStatus = "pending" | "in_progress" | "completed" | "cancelled";
+type TodoPriority = "high" | "medium" | "low";
+
+interface TodoItem {
+  content: string;
+  status: TodoStatus;
+  priority: TodoPriority;
+}
+
+function isTodoStatus(value: unknown): value is TodoStatus {
+  return value === "pending" || value === "in_progress" || value === "completed" || value === "cancelled";
+}
+
+function isTodoPriority(value: unknown): value is TodoPriority {
+  return value === "high" || value === "medium" || value === "low";
+}
+
+function todoItems(value: unknown): TodoItem[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  const items: TodoItem[] = [];
+  for (const item of value) {
+    if (!isRecord(item) || typeof item.content !== "string" || !isTodoStatus(item.status)) return undefined;
+    items.push({
+      content: item.content,
+      status: item.status,
+      priority: isTodoPriority(item.priority) ? item.priority : "medium",
+    });
+  }
+  return items;
+}
+
+function todoPayload(value: unknown): TodoItem[] | undefined {
+  return todoItems(value) ?? (isRecord(value) ? todoItems(value.todos) : undefined);
+}
+
+function parseJson(value: string): unknown {
+  try {
+    return JSON.parse(value);
+  } catch {
+    return undefined;
+  }
+}
+
+function isTodoTool(tool: string): boolean {
+  const normalized = tool.toLowerCase().replace(/[-_]/g, "");
+  return normalized === "todowrite" || normalized === "todoread";
+}
+
+function todoItemsForTool(part: Narrow<"tool">): TodoItem[] | undefined {
+  const state = part.state;
+  if (!isTodoTool(part.tool) || state.status === "error") return undefined;
+  const metadata = "metadata" in state ? state.metadata : undefined;
+  const fromMetadata = isRecord(metadata) ? todoPayload(metadata.todos) : undefined;
+  const fromInput = todoPayload(state.input.todos);
+  if (state.status !== "completed") return fromMetadata ?? fromInput;
+  return fromMetadata ?? fromInput ?? todoPayload(parseJson(state.output));
+}
+
+function todoStatusLabel(status: TodoStatus): string {
+  if (status === "in_progress") return "doing";
+  if (status === "completed") return "done";
+  if (status === "cancelled") return "cancelled";
+  return "queued";
+}
+
+function TodoList({ items, hidden }: { items: TodoItem[]; hidden: boolean }) {
+  if (items.length === 0) {
+    return (
+      <div className="part__body todo-list todo-list--empty" data-testid="todo-list" hidden={hidden}>
+        Nothing queued
+      </div>
+    );
+  }
+
+  return (
+    <ul className="part__body todo-list" data-testid="todo-list" aria-label="Todo list" hidden={hidden}>
+      {items.map((item, index) => {
+        const status = todoStatusLabel(item.status);
+        const marker = item.status === "completed" ? "✓" : item.status === "cancelled" ? "×" : item.status === "in_progress" ? "•" : "";
+        return (
+          <li
+            className="todo-list__item"
+            data-status={item.status}
+            data-priority={item.priority}
+            aria-label={`${status}, ${item.priority} priority: ${item.content}`}
+            key={`${index}:${item.content}`}
+          >
+            <span className="todo-list__marker" aria-hidden="true">{marker}</span>
+            <span className="todo-list__content">{item.content}</span>
+            <span className="todo-list__status" aria-hidden="true">{status}</span>
+          </li>
+        );
+      })}
+    </ul>
+  );
 }
 
 /* ---------------------------------------------------------------- atoms -- */
@@ -169,6 +336,7 @@ function ToolPartView({ part }: { part: Narrow<"tool"> }) {
   const toggle = useCallback(() => setOpen((value) => !value), []);
   const state = part.state;
   const status = state.status;
+  const todos = todoItemsForTool(part);
 
   const title =
     state.status === "completed"
@@ -197,7 +365,9 @@ function ToolPartView({ part }: { part: Narrow<"tool"> }) {
         <span className="tool__title">{title}</span>
         <span className="tool__status">{TOOL_LABEL[status]}</span>
       </button>
-      {open ? (
+      {todos !== undefined ? (
+        <TodoList items={todos} hidden={!open} />
+      ) : open ? (
         <pre className="part__body part__body--output" data-testid="tool-output">
           {output === "" ? "(no output)" : output}
         </pre>
@@ -208,11 +378,13 @@ function ToolPartView({ part }: { part: Narrow<"tool"> }) {
 
 /* ---------------------------------------------------------------- patch -- */
 
-function PatchPartView({ part }: { part: Narrow<"patch"> & PatchDiff }) {
+function PatchPartView({ part, completed }: { part: Narrow<"patch"> & PatchDiff; completed?: PatchDiff }) {
   const [open, setOpen] = useState(false);
   const toggle = useCallback(() => setOpen((value) => !value), []);
-  const diff = part.diff ?? "";
-  const { additions, deletions } = countDiff(diff);
+  const diff = completed?.diff ?? part.diff ?? "";
+  const counted = countDiff(diff);
+  const additions = completed?.additions ?? part.additions ?? counted.additions;
+  const deletions = completed?.deletions ?? part.deletions ?? counted.deletions;
   const label = part.files.length === 1 ? fileName(part.files[0] ?? "") : `${part.files.length} files`;
 
   return (
@@ -255,13 +427,14 @@ function PatchPartView({ part }: { part: Narrow<"patch"> & PatchDiff }) {
 
 interface MessagePartProps {
   part: Part;
+  completedPatch?: PatchDiff;
   /** Live text for this part, published by the rAF stream buffer. */
   streamText?: string;
   /** True while tokens are still arriving for this part. */
   streaming?: boolean;
 }
 
-function MessagePartImpl({ part, streamText, streaming = false }: MessagePartProps) {
+function MessagePartImpl({ part, completedPatch, streamText, streaming = false }: MessagePartProps) {
   switch (part.type) {
     case "text": {
       const text = streamText ?? part.text;
@@ -298,7 +471,7 @@ function MessagePartImpl({ part, streamText, streaming = false }: MessagePartPro
     }
 
     case "patch":
-      return <PatchPartView part={part} />;
+      return <PatchPartView part={part} completed={completedPatch} />;
 
     case "step-start":
       return <Divider type="step-start" label="step" />;
@@ -384,12 +557,15 @@ interface MessagePartsProps {
 
 /** Renders a message's parts in wire order. */
 export function MessageParts({ parts, streamTexts, streamingPartID }: MessagePartsProps) {
+  const completedPatches = useMemo(() => completedPatchesByPart(parts), [parts]);
+
   return (
     <>
       {parts.map((part) => (
         <MessagePart
           key={part.id}
           part={part}
+          completedPatch={completedPatches.get(part.id)}
           streamText={streamTexts?.[part.id]}
           streaming={streamingPartID === part.id}
         />
